@@ -88,6 +88,23 @@ def _estimate_speed(frame_rgb: np.ndarray, prev_frame: Optional[np.ndarray]) -> 
     return float(np.clip(max(speed_bar, speed_diff), 0.0, 1.0))
 
 
+def compute_on_track(frame_rgb: np.ndarray) -> bool:
+    """True if the car patch sits mostly on road (not grass).
+
+    Shared by ObservationProcessor and reward-shaped training so both use
+    identical detection.
+    """
+    frame_uint8 = frame_rgb.astype(np.uint8) if frame_rgb.dtype != np.uint8 else frame_rgb
+    grass = _grass_mask(frame_uint8)
+    margin = 6
+    r0 = max(CAR_ROW - margin, 0)
+    r1 = min(CAR_ROW + margin + 1, PLAYFIELD_ROWS)
+    c0 = max(CAR_COL - margin, 0)
+    c1 = min(CAR_COL + margin + 1, frame_uint8.shape[1])
+    car_grass = grass[r0:r1, c0:c1]
+    return bool(np.mean(car_grass) < 60)
+
+
 def _track_center_at_row(road_mask: np.ndarray, row: int) -> Optional[float]:
     """Return the horizontal center of the road at the given row, or None."""
     if row < 0 or row >= road_mask.shape[0]:
@@ -170,14 +187,7 @@ class ObservationProcessor:
         ahead = _analyse_track_ahead(road, CAR_COL)
         speed = _estimate_speed(frame_uint8, self._prev_frame)
 
-        grass = _grass_mask(frame_uint8)
-        margin = 6
-        r0 = max(CAR_ROW - margin, 0)
-        r1 = min(CAR_ROW + margin + 1, PLAYFIELD_ROWS)
-        c0 = max(CAR_COL - margin, 0)
-        c1 = min(CAR_COL + margin + 1, frame_uint8.shape[1])
-        car_grass = grass[r0:r1, c0:c1]
-        on_track = bool(np.mean(car_grass) < 60)
+        on_track = compute_on_track(frame_uint8)
 
         self._prev_frame = frame_uint8.copy()
         self._frame_idx += 1
