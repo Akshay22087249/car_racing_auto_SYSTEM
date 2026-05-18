@@ -1,202 +1,210 @@
+# CarRacing: Rule-Based en Reinforcement Learning Agents
 
-# CarRacing: Motorcycle-Inspired Rule-Based Agents
+Een universitair portfolioproject voor de vakken **Rule-Based Systems** en **Reinforcement Learning**. Zeven rule-based agents en twee DQN-agents rijden in de Gymnasium `CarRacing-v3` omgeving. Daarnaast is er een interactief racespel waarbij je zelf kunt racen tegen de AI-agents.
 
-A university portfolio project for a **Rule-Based Systems** course. Seven agents (1 baseline + 6 expert) compete in the Gymnasium `CarRacing-v3` environment using only hand-crafted rules, no machine learning -> autonomous systems.
-
-Every agent's decision logic is motivated by **real-world motorcycle riding dynamics**: braking before curves, managing traction, following the racing line, and adapting aggression on the fly.
-
-<video src="results/videos/comparison.mp4" controls width="100%"></video>
+---
 
 ## Agents
 
-| Agent | Metaphor | Strategy |
+| Agent | Type | Strategie |
 |---|---|---|
-| **Random Baseline** | None | Uniform random actions (performance floor) |
-| **Cautious (My Sister)** | New rider | Safety-first: brakes early, gentle corrections, anticipatory mid-offset steering |
-| **Max Verstappen** | Track-day rider | "Slow in, fast out" cornering via a 4-phase state machine |
-| **Traction Focused** | Grip-conscious rider | Friction-circle traction budget limits simultaneous steering + gas |
-| **MotoGP** | MotoGP rider | Three-tier steering with adaptive confidence and reward-based aggression scaling |
-| **Rain Rider** | Wet-weather rider | Adaptive aggression that backs off after mistakes and pushes when confident |
-| **Line Hunter** | Precision rider | Weighted trajectory planning using blended near/mid/far offset proportional control |
+| Random baseline | Rule-based | Willekeurige acties (ondergrens) |
+| Cautious (My Sister) | Rule-based | Veiligheid eerst, vroeg remmen, zachte correcties |
+| Max Verstappen | Rule-based | Langzaam in, snel uit via een toestandsmachine |
+| Traction Focused | Rule-based | Frictiecirkel: sturen kost budget |
+| MotoGP | Rule-based | Hiërarchisch prioriteitssysteem met adaptief vertrouwen |
+| Rain Rider | Rule-based | Adaptieve agressiviteit op basis van recente prestaties |
+| Line Hunter | Rule-based | Gewogen trajectplanning via near/mid/far offset |
+| DQN-agent | Reinforcement Learning | Zelflerend via Deep Q-Network, getraind op 500 episodes |
 
-## Results (10 episodes, seed 42, 2000 steps)
 
-| Rank | Agent | Avg Reward | Best Episode | Completion % | Off-Track % |
-|------|-------|-----------|-------------|-------------|-------------|
-| 1st | Cautious (My Sister) | 630.8 | 875.6 | 70.7% | 16.7% |
-| 2nd | Rain Rider | 623.3 | 877.2 | 69.8% | 19.6% |
-| 3rd | MotoGP | 621.5 | 887.2 | 69.1% | 20.3% |
-| 4th | Traction Focused | 609.2 | 864.4 | 68.2% | 19.1% |
-| 5th | Line Hunter | 602.9 | 834.9 | 67.0% | 20.5% |
-| 6th | Max Verstappen | 578.7 | 856.6 | 64.9% | 19.5% |
-| 7th | Random Baseline | -129.2 | -118.7 | 0.0% | 14.0% |
+---
 
-All six rule-based agents beat the random baseline. The top agents achieve 65-70% average lap completion with best episodes reaching 95-98% completion (lap complete).
+## Resultaten (10 evaluatie-episodes, seed 42)
 
-## Comparison Video
+| Rang | Agent | Gem. beloning | Voltooiing | Std. afwijking |
+|------|-------|--------------|-----------|----------------|
+| 1 | DQN-agent | 783.9 | 87.1% | 34.4 |
+| 2 | Cautious (My Sister) | 630.8 | 70.7% | 290.6 |
+| 3 | Line Hunter | 626.9 | 69.7% | 233.7 |
+| 4 | Traction Focused | 626.7 | 70.1% | 324.5 |
+| 5 | Rain Rider | 623.3 | 69.8% | 288.8 |
+| 6 | MotoGP | 621.5 | 69.1% | 309.8 |
+| 7 | Max Verstappen | 578.7 | 64.9% | 328.3 |
+| 8 | Random Baseline | -127.8 | 0.0% | 7.1 |
 
-A side-by-side video of all agents running their best episodes is generated with:
+De DQN-agent presteert beter dan alle rule-based agents en is veel consistenter (standaardafwijking van 34 tegenover 290+ bij rule-based agents).
+
+---
+
+## Vergelijkingsvideo
+
+Alle agents naast elkaar in één video:
+https://www.youtube.com/watch?v=Mksyq7B8tyU
+
+---
+
+## Installatie
 
 ```bash
-python compare_video.py
-```
-
-This produces `results/videos/comparison.mp4` with all 7 agents in a grid, colour-coded borders, live HUD overlays, and "LAP COMPLETE" / "CRASHED" indicators when agents finish.
-
-## Installation
-
-```bash
+pip install swig
 pip install -r requirements.txt
 ```
 
-> **Note:** `gymnasium[box2d]` requires [SWIG](https://www.swig.org/) to build Box2D. On Windows you may need `conda install swig` or download the SWIG binary.
-
-## Usage
-
+Voor GPU-training (NVIDIA):
 ```bash
-# Evaluate all agents (50 episodes each, headless)
-python main.py
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+```
 
-# Record video of the best episode per agent
-python main.py --record
+> **Let op:** `gymnasium[box2d]` vereist [SWIG](https://www.swig.org/) voor Box2D. Op Windows: `pip install swig`.
 
-# Run a single agent with rendering
-python main.py --agent motogp --render
+---
 
-# Quick test
-python main.py --episodes 5
+## Gebruik
 
-# Generate side-by-side comparison video
+### Rule-based agents evalueren
+```bash
+python main.py --episodes 10
+```
+
+### Vergelijkingsvideo genereren
+```bash
 python compare_video.py
-
-# Available agents: random, cautious, verstappen, traction, motogp, rain, linehunter
-python main.py --agent rain --episodes 20
 ```
 
-## What changed and why
+### Racespel spelen (jij vs. AI)
+```bash
+python generate_ghosts_batch.py
+python race_game.py
+```
 
-### The Cursor starting point
+### Standaard DQN trainen
+```bash
+python train_dqn.py --episodes 500 --epsilon-decay 0.99999
+```
 
-The initial codebase was scaffolded using Cursor (AI-assisted IDE). Cursor built a working project structure with 5 agents, observation preprocessing, metrics, and visualisation. However, the agents performed poorly: all scored negative mean rewards (-48 to -63) with 59-73% off-track rates.
+### DQN met reward shaping trainen
+```bash
+python train_dqn_shaped.py
+```
 
-Cursor went through multiple debugging iterations:
-- Fixed the zoom-in warmup animation (first 50 frames produce garbage features)
-- Switched from ray-casting to track-center offset following
-- Tuned steering cooldowns and thresholds multiple times
-- Rebuilt the Superbike Pro agent from a voting system to a hierarchical priority system
+### Sweep uitvoeren voor shaped versie
+```bash
+python run_shaped_sweep.py
+```
 
-Despite these improvements, **all agents scored negative rewards** because they spent 60-73% of their time off-track.
+### Trainingsgrafieken bekijken
+```bash
+python plot_dqn.py
+```
 
-### The critical bug: inverted steering direction
+### DQN vergelijken met rule-based agents
+```bash
+python evaluate_dqn.py --episodes 10
+```
 
-The root cause was discovered through empirical testing. In CarRacing-v3, the camera rotates with the car (top-down, following), creating a counter-intuitive relationship between track offsets and steering:
+### Alternatieve evaluatie
+```bash
+python evaluate_dqn_1.py --episodes 10
+```
 
-- **Positive offset** (road center appears to the RIGHT) is corrected by steering **LEFT** (action 1)
-- **Negative offset** (road center appears to the LEFT) is corrected by steering **RIGHT** (action 2)
+### Hyperparameter experiment uitvoeren
+```bash
+python hyperparam_experiment.py --episodes 150
+```
 
-All agents had this backwards. **Fixing this single bug improved scores from -60 average to +470 average**, a ~530-point improvement. Off-track rates dropped from 70-90% to 2-15%.
+---
 
-### What I got right
-
-1. **Project structure**: clean separation of concerns (agents, environment, evaluation, config)
-2. **Observation preprocessing**: grass-based track detection and track-center offset calculation
-3. **Warmup handling**: correctly identified and handled the 50-frame zoom animation
-4. **Reproducibility**: deterministic seeding per episode for fair comparison
-5. **Visualisation suite**: 6 comparison plots generated automatically
-
-### What was wrong
-
-1. **Steering direction**: never empirically tested whether `LEFT if offset < 0` actually corrected a negative offset
-2. **Over-engineering before validating basics**: built complex voting systems and state machines before verifying that basic steering worked
-3. **Excessive cooldowns**: original cooldowns (4-12 steps) were far too long; the car needs to correct every 1-2 frames
-4. **Conservative thresholds**: steering thresholds of 0.08-0.14 were too high for the small offsets on straight roads
-
-### Improvements made after (help with AI)
-
-1. **Fixed steering direction** in all agents
-2. **Added two new agents**: Rain Rider (adaptive aggression) and Line Hunter (trajectory planning)
-3. **Added five driving improvements** across all agents:
-   - Off-track braking: brake when off-track at speed to prevent overshoot
-   - Multi-frame recovery: commit to steering corrections for 3-5 frames instead of single-frame corrections
-   - Curvature-based braking: use `abs(off_far - off_near)` as the primary brake trigger instead of just far offset
-   - Proportional cooldowns: shorter cooldowns when far off-center for faster correction
-   - Straight boost: gas harder when the road is straight (low curvature)
-4. **Increased episode length** from 1000 to 2000 steps so agents can complete full laps
-5. **Added comparison video** (`compare_video.py`) that shows all agents side-by-side
-6. **Added video recording** (`--record`) with HUD overlay showing agent name, reward, speed, action, and off-track warnings
-
-## Project Structure
+## Projectstructuur
 
 ```
-CarRacing_AutonomousSystems/
+car_racing_auto_SYSTEM/
 ├── README.md
 ├── requirements.txt
-├── config.py                      # Shared constants and hyperparameters
-├── main.py                        # Entry point: evaluate agents, generate plots
-├── environment.py                 # Observation preprocessing (pixels → features)
+├── config.py                        # Gedeelde constanten en hyperparameters
+├── main.py                          # Evalueer rule-based agents, genereer plots
+├── environment.py                   # Observatieverwerking (pixels naar features)
+├── train_dqn.py                     # Train de standaard DQN-agent
+├── train_dqn_shaped.py              # Train DQN met reward shaping
+├── run_shaped_sweep.py              # Sweep voor shaped DQN configuraties
+├── evaluate_dqn.py                  # Vergelijk DQN met rule-based agents
+├── evaluate_dqn_1.py                # Alternatieve evaluatie
+├── plot_dqn.py                      # Trainingsgrafieken genereren
+├── hyperparam_experiment.py         # Hyperparameter vergelijking
+├── compare_video.py                 # Vergelijkingsvideo alle agents
+├── race_game.py                     # Racespel: mens vs. AI
+├── generate_ghosts_batch.py         # Ghost data genereren voor racespel
 │
-├── race_game.py                   # Entry point wrapper → game/race.py
-├── compare_video.py               # Entry point wrapper → evaluation/compare_video.py
-├── generate_ghosts_batch.py       # Entry point wrapper → game/generate_ghosts.py
-│
-├── agents/                        # Rule-based agent implementations
-│   ├── __init__.py                # Agent registry (ALL_AGENTS)
-│   ├── base_agent.py              # Abstract base class
-│   ├── baseline_random.py         # Baseline: random actions
-│   ├── agent_cautious.py          # Cautious (My Sister)
-│   ├── agent_apex.py              # Max Verstappen
-│   ├── agent_traction.py          # Traction Focused
-│   ├── agent_superbike.py         # MotoGP
-│   ├── agent_rain.py              # Rain Rider
-│   └── agent_line_hunter.py       # Line Hunter
-│
-├── game/                          # Championship race game (pygame)
+├── agents/
 │   ├── __init__.py
-│   ├── race.py                    # Race loop, HUD, screens, ghost rendering
-│   └── generate_ghosts.py         # Batch ghost data generation (subprocess)
+│   ├── base_agent.py                # Abstracte basisklasse
+│   ├── baseline_random.py           # Random baseline
+│   ├── agent_cautious.py            # Cautious (My Sister)
+│   ├── agent_apex.py                # Max Verstappen
+│   ├── agent_traction.py            # Traction Focused
+│   ├── agent_superbike.py           # MotoGP
+│   ├── agent_rain.py                # Rain Rider
+│   ├── agent_line_hunter.py         # Line Hunter
+│   └── dqn_agent.py                 # Deep Q-Network agent
 │
-├── evaluation/                    # Metrics, plots, and video comparison
-│   ├── __init__.py
-│   ├── metrics.py                 # Per-episode metric tracking
-│   ├── visualize.py               # matplotlib/seaborn comparison plots
-│   └── compare_video.py           # Side-by-side agent comparison video
+├── evaluation/
+│   ├── metrics.py                   # Metrics per episode
+│   ├── visualize.py                 # Vergelijkingsplots
+│   └── compare_video.py             # Vergelijkingsvideo
 │
-└── results/                       # Auto-generated outputs
-    ├── results.csv
-    ├── ghosts/                    # Ghost replay data (JSON per agent per seed)
-    └── videos/
-        ├── comparison.mp4         # All agents side-by-side
-        └── best_*.mp4             # Individual best-episode recordings
+├── game/
+│   ├── race.py                      # Racespel loop en HUD
+│   └── generate_ghosts.py           # Ghost data genereren
+│
+└── results/
+    ├── results.csv                  # Rule-based resultaten
+    ├── dqn/
+    │   ├── dqn_training_log.csv     # DQN trainingslog
+    │   ├── dqn_comparison.csv       # Vergelijking DQN vs. rule-based
+    │   ├── checkpoints/             # Opgeslagen modellen
+    │   │   ├── dqn_best.pt
+    │   │   └── dqn_latest.pt
+    │   └── hyperparams/             # Hyperparameter experiment resultaten
+    ├── ghosts/                      # Ghost data voor racespel
+    └── videos/                      # Opgenomen videos
 ```
 
-## Metrics
+---
 
-Each agent is evaluated on:
+## DQN implementatie
 
-- **Total reward**: primary environment score (+1000/N per tile visited, -0.1 per frame)
-- **Lap completion %**: approximated from cumulative reward (reward / 900 * 100)
-- **Survival steps**: how long the agent lasts (max 2000)
-- **Off-track %**: proportion of steps spent on grass
-- **Average speed**: estimated from the on-screen speed bar and frame differencing
+De DQN-agent is volledig zelf geïmplementeerd zonder gebruik van RL-bibliotheken zoals Stable Baselines. De belangrijkste onderdelen zijn:
 
-## Observation Preprocessing
+**Neuraal netwerk:** drie convolutielagen die patronen uit de pixels halen, gevolgd door twee volledig verbonden lagen die Q-waarden berekenen per actie.
 
-The `environment.py` module converts each 96x96x3 RGB frame into a feature dictionary:
+**Experience replay:** ervaringen worden opgeslagen in een buffer van 50.000 entries. Per trainingstap wordt een willekeurige batch van 64 ervaringen gesampled om correlatie te doorbreken.
 
-| Feature | Description |
+**Doelnetwerk:** een apart netwerk voor stabiele doelwaarden, elke 1.000 stappen bijgewerkt.
+
+**Epsilon-greedy exploratie:** epsilon daalt van 1.0 naar 0.05 over de training zodat de agent eerst verkent en later exploiteert.
+
+**Framestack:** vier opeenvolgende grijswaarden frames worden gestapeld als invoer zodat het netwerk bewegingsinformatie heeft.
+
+**Reward shaping (train_dqn_shaped.py):** een extra beloningssignaal dat de agent straft voor off-track rijden en beloont voor op de baan blijven, zodat hij netter leert rijden.
+
+---
+
+## Observatieverwerking (rule-based agents)
+
+De `environment.py` module zet ruwe 96x96 RGB-frames om naar een feature dictionary:
+
+| Feature | Omschrijving |
 |---|---|
-| `offset_near` | Track center offset at 10 rows ahead [-1, 1] |
-| `offset_mid` | Track center offset at 25 rows ahead [-1, 1] |
-| `offset_far` | Track center offset at 40 rows ahead [-1, 1] |
-| `curve_direction` | -1 (left), 0 (straight), +1 (right) |
-| `curve_sharpness` | 0.0 (straight) to 1.0 (hairpin) |
-| `speed` | Estimated speed [0, 1] |
-| `on_track` | Boolean: is the car on the road? |
-| `warmup` | True for first 50 frames (zoom animation) |
+| `offset_near` | Baanmidden offset op korte afstand [-1, 1] |
+| `offset_mid` | Baanmidden offset op middellange afstand [-1, 1] |
+| `offset_far` | Baanmidden offset op verre afstand [-1, 1] |
+| `curve_sharpness` | Scherpte van de bocht (0 = recht, 1 = haarspeld) |
+| `speed` | Geschatte snelheid [0, 1] |
+| `on_track` | Boolean: is de auto op de baan? |
+| `warmup` | True tijdens de eerste 50 frames (inzoomanimatie) |
 
-Track detection uses grass colour isolation (green channel dominant), and the road is defined as everything that is NOT grass with minimum brightness > 40.
+---
 
-## Reproducibility
+## Reproduceerbaarheid
 
-All experiments use a deterministic base seed (default `42`). Each episode `i` receives seed `base_seed + i`, ensuring identical track layouts across agents.
-
+Alle experimenten gebruiken een vaste basis-seed (standaard 42). Elke episode krijgt seed `basis_seed + episode`, zodat alle agents op exact dezelfde banen worden getest.
