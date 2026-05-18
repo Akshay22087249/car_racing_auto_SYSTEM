@@ -1,6 +1,6 @@
 # CarRacing: Rule-Based en Reinforcement Learning Agents
 
-Een universitair portfolioproject voor de vakken **Rule-Based Systems** en **Reinforcement Learning**. Zeven rule-based agents en twee DQN-agents rijden in de Gymnasium `CarRacing-v3` omgeving. Daarnaast is er een interactief racespel waarbij je zelf kunt racen tegen de AI-agents.
+Een universitair portfolioproject voor de vakken **Rule-Based Systems** en **Reinforcement Learning**. Zeven rule-based agents en DQN-agents rijden in de Gymnasium `CarRacing-v3` omgeving. Daarnaast is er een interactief racespel waarbij je zelf kunt racen tegen de AI-agents.
 
 ---
 
