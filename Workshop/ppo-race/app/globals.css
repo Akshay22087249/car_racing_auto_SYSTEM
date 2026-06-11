@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0f172a;
+  --foreground: #f1f5f9;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(251, 191, 36, 0.07), transparent),
+    radial-gradient(900px 500px at -10% 110%, rgba(99, 102, 241, 0.1), transparent),
+    var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* draw-in animation for the player's own learning curve */
+.curve-draw {
+  stroke-dasharray: 2000;
+  stroke-dashoffset: 2000;
+  animation: curve-draw 2.2s ease-out forwards;
+}
+
+@keyframes curve-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
