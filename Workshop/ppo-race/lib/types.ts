@@ -20,6 +20,10 @@ export interface PlayerData {
   id: string;
   name: string;
   color: string;
+  /** chosen F1 team id (see lib/teams) */
+  team?: string;
+  /** 1 or 2, the driver slot within the team (join order) */
+  driverNumber?: number;
   joinedAt: number;
   rounds: Record<number, RoundRecord>;
   racePoints?: number;
@@ -44,6 +48,10 @@ export interface RaceCar {
   color: string;
   /** 0..1, derived from the final tuned agent */
   skill: number;
+  /** team accent colour for the car's livery (wings/stripe) */
+  accent: string;
+  /** driver slot within the team, for the livery */
+  driverNumber?: number;
   /** verdict of the player's final tuning round, for race commentary */
   lastVerdict: Verdict;
   /** track units per second */
@@ -57,6 +65,8 @@ export interface PlayerPublic {
   id: string;
   name: string;
   color: string;
+  team?: string;
+  driverNumber?: number;
   score: number;
   answered: boolean;
 }
@@ -65,6 +75,7 @@ export interface CurvePublic {
   id: string;
   name: string;
   color: string;
+  team?: string;
   clip: number | null;
   lr: number | null;
   points: number;
@@ -99,6 +110,7 @@ export interface StateResponse {
   me?: {
     name: string;
     color: string;
+    team?: string;
     totalScore: number;
     currentRound: RoundRecord | null;
     /** the player's previous round, to coach the next pick */

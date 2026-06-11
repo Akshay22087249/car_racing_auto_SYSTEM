@@ -52,6 +52,7 @@ export default function RaceView({
   const doneRef = useRef(false);
   const spinRef = useRef<Record<string, boolean>>({});
   const finRef = useRef<Record<string, boolean>>({});
+  const leaderRef = useRef<string | null>(null);
   // keep the callback in a ref so re-renders don't restart the animation loop
   const onAllFinishedRef = useRef(onAllFinished);
   useEffect(() => {
@@ -149,20 +150,65 @@ export default function RaceView({
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(heading);
-      const L = 13 * scale;
-      const Wc = 7 * scale;
-      ctx.fillStyle = "rgba(0,0,0,0.35)";
-      ctx.fillRect(-L / 2 + 2, -Wc / 2 + 2, L, Wc);
-      ctx.fillStyle = car.color;
-      ctx.strokeStyle = "white";
-      ctx.lineWidth = 1.5;
+      // top-down F1 single-seater: nose points along +x (forward)
+      const s = scale;
+      const halfL = 8 * s;
+      const trackW = 4.6 * s;
+      const tyreL = 4 * s;
+      const tyreW = 2 * s;
+      const bodyW = 2.4 * s;
+      const axleF = halfL * 0.62;
+      const axleR = -halfL * 0.62;
+
+      // soft shadow
+      ctx.fillStyle = "rgba(0,0,0,0.30)";
       ctx.beginPath();
-      ctx.roundRect(-L / 2, -Wc / 2, L, Wc, 3);
+      ctx.ellipse(0, 1.5 * s, halfL * 1.05, trackW * 0.95, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // tyres
+      ctx.fillStyle = "#15181c";
+      const tyre = (ax: number, ay: number) => {
+        ctx.beginPath();
+        ctx.roundRect(ax - tyreL / 2, ay - tyreW / 2, tyreL, tyreW, 1.2 * s);
+        ctx.fill();
+      };
+      tyre(axleF, -trackW);
+      tyre(axleF, trackW);
+      tyre(axleR, -trackW);
+      tyre(axleR, trackW);
+
+      // wings (accent colour)
+      ctx.fillStyle = car.accent;
+      ctx.fillRect(halfL - 0.5 * s, -trackW * 1.05, 2.2 * s, trackW * 2.1);
+      ctx.fillRect(-halfL - 1.6 * s, -trackW * 0.95, 2.2 * s, trackW * 1.9);
+
+      // tapered body
+      ctx.fillStyle = car.color;
+      ctx.strokeStyle = "rgba(255,255,255,0.85)";
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(halfL + 1.5 * s, 0);
+      ctx.lineTo(halfL * 0.35, -bodyW);
+      ctx.lineTo(-halfL * 0.5, -bodyW * 1.35);
+      ctx.lineTo(-halfL, -bodyW * 1.1);
+      ctx.lineTo(-halfL, bodyW * 1.1);
+      ctx.lineTo(-halfL * 0.5, bodyW * 1.35);
+      ctx.lineTo(halfL * 0.35, bodyW);
+      ctx.closePath();
       ctx.fill();
       ctx.stroke();
-      // windshield
-      ctx.fillStyle = "rgba(15,23,42,0.7)";
-      ctx.fillRect(L * 0.05, -Wc * 0.3, L * 0.25, Wc * 0.6);
+
+      // accent centre stripe
+      ctx.fillStyle = car.accent;
+      ctx.fillRect(-halfL * 0.5, -0.6 * s, halfL * 1.1, 1.2 * s);
+
+      // cockpit + halo
+      ctx.fillStyle = "rgba(8,10,14,0.9)";
+      ctx.beginPath();
+      ctx.ellipse(-halfL * 0.1, 0, 2 * s, 1.5 * s, 0, 0, Math.PI * 2);
+      ctx.fill();
+
       ctx.restore();
 
       ctx.font = `600 ${Math.max(13, 5 * scale)}px system-ui, sans-serif`;
@@ -220,6 +266,16 @@ export default function RaceView({
             events.push(`🏁 ${car.name} over de finish!`);
           }
         });
+
+        // lead changes (skip the very first leader, only announce overtakes)
+        const leader = rows[0];
+        if (t > 0 && leader && !leader.finished && leader.car.id !== leaderRef.current) {
+          if (leaderRef.current !== null) {
+            events.push(`🟢 ${leader.car.name} neemt de leiding!`);
+          }
+          leaderRef.current = leader.car.id;
+        }
+
         if (events.length) {
           const items = events.map((text) => ({ id: idRef.current++, text }));
           setToasts((cur) => [...items, ...cur].slice(0, 4));

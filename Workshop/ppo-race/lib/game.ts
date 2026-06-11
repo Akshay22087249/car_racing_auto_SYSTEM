@@ -66,6 +66,8 @@ export function buildState(
     id: p.id,
     name: p.name,
     color: p.color,
+    team: p.team,
+    driverNumber: p.driverNumber,
     score: totalScore(p),
     answered: Boolean(p.rounds[meta.round]),
   }));
@@ -91,6 +93,7 @@ export function buildState(
         id: p.id,
         name: p.name,
         color: p.color,
+        team: p.team,
         clip: rec?.clip ?? null,
         lr: rec?.lr ?? null,
         points: rec?.points ?? 0,
@@ -131,6 +134,7 @@ export function buildState(
       state.me = {
         name: me.name,
         color: me.color,
+        team: me.team,
         totalScore: totalScore(me),
         currentRound: me.rounds[meta.round] ?? null,
         prevRound: me.rounds[meta.round - 1] ?? null,

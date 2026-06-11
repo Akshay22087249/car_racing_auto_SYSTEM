@@ -3,7 +3,7 @@ import { racePointsForPosition, ROUND_SECONDS, TOTAL_ROUNDS } from "@/lib/consta
 import { buildRaceCars } from "@/lib/race";
 import { getStore } from "@/lib/store";
 
-type Action = "startRound" | "endRound" | "startRace" | "podium";
+type Action = "startRound" | "endRound" | "startRace" | "podium" | "reset";
 
 export async function POST(
   req: Request,
@@ -71,6 +71,22 @@ export async function POST(
         return NextResponse.json({ error: "Er is geen race bezig" }, { status: 409 });
       }
       meta.phase = "podium";
+      break;
+    }
+    case "reset": {
+      // back to the lobby with the same players, but wipe all scores/curves
+      meta.phase = "lobby";
+      meta.round = 0;
+      meta.roundEndsAt = 0;
+      meta.raceStartedAt = 0;
+      const players = Object.values(await store.getPlayers(pin));
+      for (const p of players) {
+        p.rounds = {};
+        delete p.racePoints;
+        delete p.racePosition;
+        await store.setPlayer(pin, p);
+      }
+      await store.setRace(pin, []);
       break;
     }
     default:

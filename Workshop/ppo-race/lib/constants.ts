@@ -23,6 +23,8 @@ export interface RoundEnv {
   round: number;
   theme: string;
   intro: string;
+  /** one-line reasoning shown on the beamer, reinforces the lesson */
+  why: string;
   clipOpt: number;
   lrOpt: number;
   /** octaves of slack around the optimum before growth/instability bite */
@@ -32,11 +34,11 @@ export interface RoundEnv {
 }
 
 export const ROUND_ENVS: RoundEnv[] = [
-  { round: 1, theme: "Vind de clip-sweetspot", intro: "kies je clip ε", clipOpt: 0.2, lrOpt: 3e-4, tolerance: 1.6, showLr: false },
-  { round: 2, theme: "Stem ook de learning rate", intro: "kies clip ε én learning rate", clipOpt: 0.2, lrOpt: 3e-4, tolerance: 1.4, showLr: true },
-  { round: 3, theme: "De sweetspot verschuift", intro: "je agent is volwassener, dus stel opnieuw af", clipOpt: 0.1, lrOpt: 3e-4, tolerance: 1.3, showLr: true },
-  { round: 4, theme: "Anneal je learning rate", intro: "het is laat in de training, verlaag je learning rate", clipOpt: 0.1, lrOpt: 1e-4, tolerance: 1.2, showLr: true },
-  { round: 5, theme: "Fine-tunen", intro: "laatste ronde, de marges zijn klein", clipOpt: 0.05, lrOpt: 1e-4, tolerance: 0.95, showLr: true },
+  { round: 1, theme: "Vind de clip-sweetspot", intro: "kies je clip ε", why: "Een te kleine clip ε leert traag, een te grote stort in. Zoek de stabiele middenweg.", clipOpt: 0.2, lrOpt: 3e-4, tolerance: 1.6, showLr: false },
+  { round: 2, theme: "Stem ook de learning rate", intro: "kies clip ε én learning rate", why: "De learning rate schaalt elke stap. Samen met de clip ε bepaalt hij hoe groot je updates zijn.", clipOpt: 0.2, lrOpt: 3e-4, tolerance: 1.4, showLr: true },
+  { round: 3, theme: "De sweetspot verschuift", intro: "je agent is volwassener, dus stel opnieuw af", why: "Je agents zijn nu verder getraind. Een grote clip ε verandert het beleid te hard, dus de veilige sweetspot is kleiner geworden.", clipOpt: 0.1, lrOpt: 3e-4, tolerance: 1.3, showLr: true },
+  { round: 4, theme: "Anneal je learning rate", intro: "het is laat in de training, verlaag je learning rate", why: "Laat in de training wil je kleine, precieze stappen. Verlaag je learning rate (annealing), anders schiet je over het doel heen.", clipOpt: 0.1, lrOpt: 1e-4, tolerance: 1.2, showLr: true },
+  { round: 5, theme: "Fine-tunen", intro: "laatste ronde, de marges zijn klein", why: "Finetunen: de marges zijn klein, kleine bijstellingen werken nu het best.", clipOpt: 0.05, lrOpt: 1e-4, tolerance: 0.95, showLr: true },
 ];
 
 export function roundEnv(round: number): RoundEnv {

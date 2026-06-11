@@ -6,6 +6,7 @@ import Countdown from "@/components/Countdown";
 import CurveChart from "@/components/CurveChart";
 import { CLIP_OPTIONS, LR_OPTIONS, lrLabel, roundEnv } from "@/lib/constants";
 import { roundCoach, VERDICT_HINTS, VERDICT_LABELS } from "@/lib/sim";
+import { teamById } from "@/lib/teams";
 import { useGame, postJson } from "@/lib/useGame";
 import type { RoundRecord, StateResponse } from "@/lib/types";
 
@@ -88,6 +89,11 @@ export default function PlayerScreen() {
           style={{ background: me.color }}
         />
         <span className="font-bold">{me.name}</span>
+        {teamById(me.team) && (
+          <span className="text-xs text-slate-400">
+            {teamById(me.team)!.name}
+          </span>
+        )}
         <span className="ml-auto text-sm text-slate-400 tabular-nums">
           {me.totalScore} pnt
         </span>

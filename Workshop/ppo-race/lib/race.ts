@@ -6,6 +6,7 @@ import {
   RETURN_MIN,
 } from "./constants";
 import { rngFor } from "./rng";
+import { NEUTRAL_ACCENT, teamById } from "./teams";
 import type { PlayerData, RaceCar } from "./types";
 
 /**
@@ -135,6 +136,8 @@ export function buildRaceCars(players: PlayerData[], seed: number): RaceCar[] {
       name: p.name,
       color: p.color,
       skill,
+      accent: teamById(p.team)?.accent ?? NEUTRAL_ACCENT,
+      driverNumber: p.driverNumber,
       lastVerdict,
       speed,
       spins,

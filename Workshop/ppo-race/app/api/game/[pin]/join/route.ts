@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { playerColor } from "@/lib/constants";
 import { randomId } from "@/lib/game";
 import { getStore } from "@/lib/store";
+import { TEAM_CAPACITY, teamById } from "@/lib/teams";
 import type { PlayerData } from "@/lib/types";
 
 export async function POST(
@@ -14,9 +15,11 @@ export async function POST(
   if (!meta) {
     return NextResponse.json({ error: "Game niet gevonden" }, { status: 404 });
   }
-  if (meta.phase !== "lobby") {
+  // late joiners may hop in during the tuning rounds (they start fresh);
+  // only the race and podium are closed to newcomers
+  if (meta.phase === "race" || meta.phase === "podium") {
     return NextResponse.json(
-      { error: "De game is al begonnen" },
+      { error: "De race is al bezig, je kunt niet meer meedoen" },
       { status: 409 }
     );
   }
@@ -25,11 +28,36 @@ export async function POST(
   if (!name) {
     return NextResponse.json({ error: "Vul een naam in" }, { status: 400 });
   }
-  const players = await store.getPlayers(pin);
+
+  const players = Object.values(await store.getPlayers(pin));
+
+  // a chosen F1 team sets the livery colour and enforces the 2-driver cap
+  const team = teamById(String(body.team ?? ""));
+  let color: string;
+  let teamId: string | undefined;
+  let driverNumber: number | undefined;
+  if (team) {
+    const inTeam = players.filter((p) => p.team === team.id);
+    if (inTeam.length >= TEAM_CAPACITY) {
+      return NextResponse.json(
+        { error: `${team.name} zit al vol (2 coureurs)` },
+        { status: 409 }
+      );
+    }
+    teamId = team.id;
+    color = team.color;
+    driverNumber = inTeam.length + 1;
+  } else {
+    // privateer fallback when no team is chosen
+    color = playerColor(players.length);
+  }
+
   const player: PlayerData = {
     id: randomId(),
     name,
-    color: playerColor(Object.keys(players).length),
+    color,
+    team: teamId,
+    driverNumber,
     joinedAt: Date.now(),
     rounds: {},
   };

@@ -6,7 +6,7 @@ import {
   STREAK_BONUS,
   roundEnv,
 } from "@/lib/constants";
-import { roundPoints, simulateRound } from "@/lib/sim";
+import { simulateRound } from "@/lib/sim";
 import { getStore } from "@/lib/store";
 import type { RoundRecord } from "@/lib/types";
 
@@ -71,10 +71,19 @@ export async function POST(
   }
   const bonus = streak >= 2 ? STREAK_BONUS * (streak - 1) : 0;
 
+  // score on progress beyond your best level so far: collapsing and then
+  // merely regaining lost ground earns nothing, so the leaderboard rewards how
+  // high you actually got rather than how wildly you swung.
+  const highWater = Math.max(
+    RETURN_START,
+    ...Object.values(player.rounds).map((r) => r.endP)
+  );
+  const gain = Math.max(0, sim.endP - highWater);
+
   const record: RoundRecord = {
     ...sim,
     bonus,
-    points: roundPoints(sim) + bonus,
+    points: gain + bonus,
   };
   player.rounds[meta.round] = record;
   await store.setPlayer(pin, player);

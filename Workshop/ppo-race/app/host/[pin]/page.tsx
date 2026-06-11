@@ -3,14 +3,16 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import Countdown from "@/components/Countdown";
 import CurveChart from "@/components/CurveChart";
 import RaceView from "@/components/RaceView";
 import { CLIP_OPTIONS, LR_OPTIONS, lrLabel, roundEnv } from "@/lib/constants";
 import { PPO_FACTS, RECAP_POINTS, RECAP_SOURCE } from "@/lib/education";
 import { VERDICT_LABELS } from "@/lib/sim";
+import { teamById, type Team } from "@/lib/teams";
 import { useGame, postJson } from "@/lib/useGame";
-import type { ChoiceDist, StateResponse } from "@/lib/types";
+import type { ChoiceDist, PlayerPublic, StateResponse } from "@/lib/types";
 
 export default function HostScreen() {
   const { pin } = useParams<{ pin: string }>();
@@ -64,6 +66,16 @@ export default function HostScreen() {
       }, 50);
     }
     await act("startRace");
+  };
+
+  const reset = () => {
+    if (
+      window.confirm(
+        "Game resetten naar de lobby? Alle scores en curves gaan verloren."
+      )
+    ) {
+      act("reset");
+    }
   };
 
   // stop the anthem (and any running fade) as soon as we leave the race
@@ -120,8 +132,16 @@ export default function HostScreen() {
   }
 
   return (
-    <main className="flex flex-1 flex-col p-8 lg:p-12 gap-8">
-      <audio ref={songRef} src="/race-song.mp3" preload="auto" />
+    <main className="relative flex flex-1 flex-col p-8 lg:p-12 gap-8">
+      <audio ref={songRef} src="/race-song.mp3" preload="auto" loop />
+      {state.phase !== "lobby" && (
+        <button
+          onClick={reset}
+          className="absolute right-4 top-4 z-30 rounded-lg bg-slate-800/80 px-3 py-1.5 text-xs font-semibold text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+        >
+          ↺ Reset
+        </button>
+      )}
       {memoryWarning && (
         <div className="rounded-xl bg-red-900/60 border border-red-500 px-4 py-2 text-sm">
           ⚠️ Geen Redis gekoppeld (UPSTASH_REDIS_REST_URL/TOKEN ontbreekt). Op
@@ -211,22 +231,37 @@ function Lobby({
   onStart: () => void;
 }) {
   const [origin, setOrigin] = useState("");
+  const [fullOrigin, setFullOrigin] = useState("");
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- window is client-only
     setOrigin(window.location.origin.replace(/^https?:\/\//, ""));
+    setFullOrigin(window.location.origin);
   }, []);
   return (
     <section className="flex flex-1 flex-col items-center justify-center gap-10 text-center">
       <h1 className="text-5xl font-black tracking-tight">
         🏎️ PPO <span className="text-amber-400">Race</span>
       </h1>
-      <div className="flex flex-col items-center gap-2">
-        <p className="text-2xl text-slate-300">
-          Ga naar <span className="font-bold text-white">{origin}</span> en vul in:
-        </p>
-        <p className="text-9xl font-black tracking-widest text-amber-400 tabular-nums">
-          {pin}
-        </p>
+      <div className="flex flex-col items-center gap-6 lg:flex-row lg:gap-12">
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-2xl text-slate-300">
+            Ga naar <span className="font-bold text-white">{origin}</span> en vul
+            in:
+          </p>
+          <p className="text-9xl font-black tracking-widest text-amber-400 tabular-nums">
+            {pin}
+          </p>
+        </div>
+        {fullOrigin && (
+          <div className="flex flex-col items-center gap-2">
+            <div className="rounded-2xl bg-white p-3">
+              <QRCodeSVG value={`${fullOrigin}/?pin=${pin}`} size={200} />
+            </div>
+            <p className="text-lg text-slate-300">
+              of scan om direct mee te doen
+            </p>
+          </div>
+        )}
       </div>
       <div className="min-h-24 w-full max-w-4xl">
         {state.playerCount === 0 ? (
@@ -275,6 +310,9 @@ function Round({
           te klein = bijna geen vooruitgang 🐌
           {env.showLr ? " · nu ook de learning rate!" : ""}
         </p>
+      </div>
+      <div className="max-w-3xl rounded-xl border border-indigo-500/40 bg-indigo-950/70 px-5 py-3 text-lg text-indigo-100">
+        💡 {env.why}
       </div>
       <Countdown
         endsAt={state.roundEndsAt}
@@ -409,6 +447,31 @@ function Results({
     () => [...curves].sort((a, b) => b.points - a.points),
     [curves]
   );
+  // element-wise class average (over players who reached each point)
+  const avgCurve = useMemo(() => {
+    if (curves.length < 2) return null;
+    const maxLen = Math.max(0, ...curves.map((c) => c.curve.length));
+    const out: number[] = [];
+    for (let i = 0; i < maxLen; i++) {
+      let sum = 0;
+      let n = 0;
+      for (const c of curves) {
+        if (i < c.curve.length) {
+          sum += c.curve[i];
+          n++;
+        }
+      }
+      if (n) out.push(Math.round(sum / n));
+    }
+    return out;
+  }, [curves]);
+  const series = useMemo(() => {
+    const base = curves.map((c) => ({ curve: c.curve, color: c.color }));
+    return avgCurve
+      ? [...base, { curve: avgCurve, color: "rgba(255,255,255,0.92)", width: 4 }]
+      : base;
+  }, [curves, avgCurve]);
+  const env = roundEnv(state.round);
   const lastRound = state.round >= state.totalRounds;
   return (
     <section className="flex flex-1 flex-col gap-6">
@@ -426,11 +489,12 @@ function Results({
       </header>
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 flex-1 min-h-0">
         <div className="xl:col-span-2 rounded-2xl bg-slate-800/60 p-4">
-          <CurveChart
-            series={curves.map((c) => ({ curve: c.curve, color: c.color }))}
-            height={420}
-            annotate
-          />
+          <CurveChart series={series} height={420} annotate />
+          {avgCurve && (
+            <p className="mt-1 text-center text-xs text-slate-400">
+              De dikke witte lijn is het klasgemiddelde.
+            </p>
+          )}
         </div>
         <div className="flex flex-col gap-3 min-h-0">
           <ol className="space-y-1.5 overflow-y-auto pr-1">
@@ -460,13 +524,16 @@ function Results({
           </ol>
           <div className="rounded-xl bg-indigo-950/70 border border-indigo-500/40 p-4 text-sm leading-relaxed text-indigo-100">
             <p className="font-bold mb-1">📚 Wat zie je?</p>
+            <p className="mb-2">
+              <b>Sweetspot deze ronde:</b> clip ε rond {env.clipOpt}
+              {env.showLr ? `, learning rate rond ${lrLabel(env.lrOpt)}` : ""}.{" "}
+              {env.why}
+            </p>
             <p>
               Een <b>vlakke</b> curve betekent te kleine updates: clip ε of
               learning rate te laag, dus de agent leert nauwelijks bij. Een{" "}
               <b>grillige of ingestorte</b> curve betekent te grote updates: clip
-              ε of learning rate te hoog, waardoor geleerd gedrag sneuvelt. De{" "}
-              <b>sweet spot</b> (clip ε rond 0.1 tot 0.3) geeft een stabiel
-              stijgende curve.
+              ε of learning rate te hoog, waardoor geleerd gedrag sneuvelt.
               {!lastRound &&
                 " Stel bij in de volgende ronde, je traint verder vanaf waar je nu bent."}
             </p>
@@ -483,8 +550,26 @@ function Podium({ state }: { state: StateResponse }) {
   const medals = ["🥇", "🥈", "🥉"];
   const heights = ["h-44", "h-32", "h-24"];
   const order = [1, 0, 2]; // silver, gold, bronze layout
+
+  // constructors' championship: teams ranked by their drivers' combined points
+  const constructors = useMemo(() => {
+    const m: Record<
+      string,
+      { team: Team; points: number; drivers: PlayerPublic[] }
+    > = {};
+    for (const p of state.players) {
+      const t = teamById(p.team);
+      if (!t) continue;
+      (m[t.id] ??= { team: t, points: 0, drivers: [] });
+      m[t.id].points += p.score;
+      m[t.id].drivers.push(p);
+    }
+    return Object.values(m).sort((a, b) => b.points - a.points);
+  }, [state.players]);
+
   return (
-    <section className="flex flex-1 flex-col items-center gap-8">
+    <section className="relative flex flex-1 flex-col items-center gap-8 overflow-hidden">
+      {!showRecap && <Confetti />}
       <div className="mt-4 flex flex-wrap items-center justify-center gap-4">
         <h1 className="text-5xl font-black">
           {showRecap ? "📚 Wat hebben we geleerd?" : "🏆 Eindstand"}
@@ -506,10 +591,13 @@ function Podium({ state }: { state: StateResponse }) {
               top3[idx] ? (
                 <div
                   key={top3[idx].id}
-                  className="flex flex-col items-center gap-3"
+                  className="flex flex-col items-center gap-2"
                 >
                   <span className="text-6xl">{medals[idx]}</span>
                   <span className="text-2xl font-bold">{top3[idx].name}</span>
+                  <span className="text-sm text-slate-400">
+                    {teamById(top3[idx].team)?.name ?? ""}
+                  </span>
                   <span className="text-xl text-amber-300 font-bold tabular-nums">
                     {top3[idx].score} punten
                   </span>
@@ -521,29 +609,116 @@ function Podium({ state }: { state: StateResponse }) {
               ) : null
             )}
           </div>
-          <ol className="w-full max-w-2xl space-y-1.5">
-            {state.players.map((p, i) => (
-              <li
-                key={p.id}
-                className="flex items-center gap-3 rounded-lg bg-slate-800/80 px-4 py-2"
-              >
-                <span className="w-8 font-bold text-slate-400 tabular-nums">
-                  {i + 1}.
-                </span>
-                <span
-                  className="inline-block h-3 w-3 rounded-full shrink-0"
-                  style={{ background: p.color }}
-                />
-                <span className="font-medium">{p.name}</span>
-                <span className="ml-auto font-bold tabular-nums text-amber-300">
-                  {p.score}
-                </span>
-              </li>
-            ))}
-          </ol>
+
+          <div className="grid w-full max-w-5xl gap-6 lg:grid-cols-2">
+            <div className="rounded-2xl bg-slate-800/40 p-4">
+              <h2 className="mb-2 text-2xl font-black">🏎️ Coureurs</h2>
+              <ol className="space-y-1.5">
+                {state.players.map((p, i) => {
+                  const t = teamById(p.team);
+                  return (
+                    <li
+                      key={p.id}
+                      className="flex items-center gap-3 rounded-lg bg-slate-800/80 px-4 py-2"
+                    >
+                      <span className="w-7 font-bold text-slate-400 tabular-nums">
+                        {i + 1}.
+                      </span>
+                      <span
+                        className="inline-block h-3 w-3 rounded-full shrink-0"
+                        style={{ background: p.color }}
+                      />
+                      <span className="font-medium">{p.name}</span>
+                      {t && (
+                        <span className="text-xs font-semibold text-slate-500">
+                          {t.short}
+                        </span>
+                      )}
+                      <span className="ml-auto font-bold tabular-nums text-amber-300">
+                        {p.score}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+
+            <div className="rounded-2xl bg-slate-800/40 p-4">
+              <h2 className="mb-2 text-2xl font-black">🏆 Constructeurs</h2>
+              <ol className="space-y-1.5">
+                {constructors.map((c, i) => (
+                  <li
+                    key={c.team.id}
+                    className="flex items-center gap-3 rounded-lg bg-slate-800/80 px-4 py-2"
+                  >
+                    <span className="w-7 font-bold text-slate-400 tabular-nums">
+                      {i + 1}.
+                    </span>
+                    <span
+                      className="inline-block h-3 w-3 rounded-full shrink-0"
+                      style={{ background: c.team.color }}
+                    />
+                    <span className="font-medium">{c.team.name}</span>
+                    <span className="truncate text-xs text-slate-500">
+                      {c.drivers.map((d) => d.name).join(", ")}
+                    </span>
+                    <span className="ml-auto font-bold tabular-nums text-amber-300">
+                      {c.points}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
         </>
       )}
     </section>
+  );
+}
+
+const CONFETTI_COLORS = [
+  "#fbbf24",
+  "#22c55e",
+  "#6366f1",
+  "#ef4444",
+  "#ec4899",
+  "#06b6d4",
+];
+
+// deterministic pseudo-random so confetti positions stay put across re-renders
+const cRand = (i: number, salt: number) => {
+  const x = Math.sin(i * 12.9898 + salt * 78.233) * 43758.5453;
+  return x - Math.floor(x);
+};
+
+function Confetti() {
+  const pieces = useMemo(
+    () =>
+      Array.from({ length: 60 }, (_, i) => ({
+        left: cRand(i, 1) * 100,
+        delay: cRand(i, 2) * 3,
+        dur: 3 + cRand(i, 3) * 2.5,
+        color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+        rot: cRand(i, 4) * 360,
+      })),
+    []
+  );
+  return (
+    <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
+      {pieces.map((p, i) => (
+        <span
+          key={i}
+          className="confetti-piece"
+          style={{
+            left: `${p.left}%`,
+            background: p.color,
+            animationDuration: `${p.dur}s`,
+            animationDelay: `${p.delay}s`,
+            transform: `rotate(${p.rot}deg)`,
+          }}
+        />
+      ))}
+    </div>
   );
 }
 
