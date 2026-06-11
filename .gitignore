@@ -26,3 +26,6 @@ env/
 # IDE
 .idea/
 .vscode/
+
+# Personal activity log (not team-shared)
+.claude-log.md
