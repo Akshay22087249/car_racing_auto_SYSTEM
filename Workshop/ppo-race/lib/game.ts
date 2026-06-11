@@ -92,12 +92,25 @@ export function buildState(
         name: p.name,
         color: p.color,
         clip: rec?.clip ?? null,
+        lr: rec?.lr ?? null,
         points: rec?.points ?? 0,
         verdict: rec?.verdict ?? "none",
         curve: concatCurve(p, meta.round),
       };
     });
     state.curves = curves;
+  }
+
+  if (opts.isHost && meta.phase === "round") {
+    const clip: Record<string, number> = {};
+    const lr: Record<string, number> = {};
+    for (const p of players) {
+      const rec = p.rounds[meta.round];
+      if (!rec) continue;
+      clip[rec.clip] = (clip[rec.clip] ?? 0) + 1;
+      lr[rec.lr] = (lr[rec.lr] ?? 0) + 1;
+    }
+    state.choiceDist = { clip, lr };
   }
 
   if (
@@ -120,6 +133,7 @@ export function buildState(
         color: me.color,
         totalScore: totalScore(me),
         currentRound: me.rounds[meta.round] ?? null,
+        prevRound: me.rounds[meta.round - 1] ?? null,
         fullCurve: concatCurve(me, meta.round),
         racePosition: me.racePosition,
         racePoints: me.racePoints,

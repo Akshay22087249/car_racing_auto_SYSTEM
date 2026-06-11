@@ -33,3 +33,19 @@ body {
     stroke-dashoffset: 0;
   }
 }
+
+/* race commentary pop-ups */
+.race-toast {
+  animation: race-toast-in 0.35s ease-out;
+}
+
+@keyframes race-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

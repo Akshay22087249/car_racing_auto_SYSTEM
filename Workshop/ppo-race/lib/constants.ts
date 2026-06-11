@@ -1,8 +1,50 @@
-export const TOTAL_ROUNDS = 3;
+export const TOTAL_ROUNDS = 5;
 export const ROUND_SECONDS = 60;
 
 /** Choices presented to the players each round */
 export const CLIP_OPTIONS = [0.01, 0.03, 0.05, 0.1, 0.2, 0.3, 0.5, 0.8];
+
+/** Learning-rate choices (shown from round 2 on); sweet spot ≈ 1e-4..3e-4 */
+export const LR_OPTIONS = [1e-5, 3e-5, 1e-4, 3e-4, 1e-3, 3e-3];
+
+/** Human-friendly label for a learning rate, e.g. 3e-4 → "3e-4" */
+export function lrLabel(lr: number): string {
+  const exp = Math.round(Math.log10(lr));
+  const mant = Math.round(lr / Math.pow(10, exp));
+  return `${mant}e${exp}`;
+}
+
+/**
+ * Per-round environment. The optimum shifts and the tolerance tightens as the
+ * agent matures, so a setting that was perfect in round 1 needs re-tuning
+ * later (the core "there is no single magic number" lesson).
+ */
+export interface RoundEnv {
+  round: number;
+  theme: string;
+  intro: string;
+  clipOpt: number;
+  lrOpt: number;
+  /** octaves of slack around the optimum before growth/instability bite */
+  tolerance: number;
+  /** whether players tune the learning rate this round */
+  showLr: boolean;
+}
+
+export const ROUND_ENVS: RoundEnv[] = [
+  { round: 1, theme: "Vind de clip-sweetspot", intro: "kies je clip ε", clipOpt: 0.2, lrOpt: 3e-4, tolerance: 1.6, showLr: false },
+  { round: 2, theme: "Stem ook de learning rate", intro: "kies clip ε én learning rate", clipOpt: 0.2, lrOpt: 3e-4, tolerance: 1.4, showLr: true },
+  { round: 3, theme: "De sweetspot verschuift", intro: "je agent is volwassener, dus stel opnieuw af", clipOpt: 0.1, lrOpt: 3e-4, tolerance: 1.3, showLr: true },
+  { round: 4, theme: "Anneal je learning rate", intro: "het is laat in de training, verlaag je learning rate", clipOpt: 0.1, lrOpt: 1e-4, tolerance: 1.2, showLr: true },
+  { round: 5, theme: "Fine-tunen", intro: "laatste ronde, de marges zijn klein", clipOpt: 0.05, lrOpt: 1e-4, tolerance: 0.95, showLr: true },
+];
+
+export function roundEnv(round: number): RoundEnv {
+  return ROUND_ENVS[Math.max(0, Math.min(ROUND_ENVS.length - 1, round - 1))];
+}
+
+/** Bonus points per extra consecutive "stabiel" round (streak). */
+export const STREAK_BONUS = 60;
 
 /** Points of the learning curve plotted per round */
 export const CURVE_POINTS = 30;

@@ -4,7 +4,11 @@ export type Verdict = "good" | "slow" | "unstable" | "collapsed" | "none";
 
 export interface RoundRecord {
   clip: number;
+  /** Learning rate chosen this round (defaults to the round optimum if hidden) */
+  lr: number;
   points: number;
+  /** Streak bonus folded into `points` for consecutive stable rounds */
+  bonus: number;
   /** Performance (return) samples for this training segment */
   curve: number[];
   startP: number;
@@ -40,6 +44,8 @@ export interface RaceCar {
   color: string;
   /** 0..1, derived from the final tuned agent */
   skill: number;
+  /** verdict of the player's final tuning round, for race commentary */
+  lastVerdict: Verdict;
   /** track units per second */
   speed: number;
   /** spin events: at distance `at`, car spins for `dur` seconds */
@@ -60,10 +66,17 @@ export interface CurvePublic {
   name: string;
   color: string;
   clip: number | null;
+  lr: number | null;
   points: number;
   verdict: Verdict;
   /** Full concatenated curve over all rounds so far */
   curve: number[];
+}
+
+/** Live tally of this round's choices, for the host histogram (host only). */
+export interface ChoiceDist {
+  clip: Record<string, number>;
+  lr: Record<string, number>;
 }
 
 export interface StateResponse {
@@ -78,6 +91,8 @@ export interface StateResponse {
   storage: "redis" | "memory";
   /** host only, during results/race/podium */
   curves?: CurvePublic[];
+  /** host only, during a live round: tally of choices so far */
+  choiceDist?: ChoiceDist;
   /** during race/podium */
   race?: { seed: number; startedAt: number; cars: RaceCar[] };
   /** player only */
@@ -86,6 +101,8 @@ export interface StateResponse {
     color: string;
     totalScore: number;
     currentRound: RoundRecord | null;
+    /** the player's previous round, to coach the next pick */
+    prevRound: RoundRecord | null;
     /** concatenated curve over all rounds so far */
     fullCurve: number[];
     racePosition?: number;

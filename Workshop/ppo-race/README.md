@@ -50,7 +50,11 @@ Open `http://localhost:3000/host` (beamer) en `http://localhost:3000`
    *Connect to project*. Daarmee staan `UPSTASH_REDIS_REST_URL` en
    `UPSTASH_REDIS_REST_TOKEN` (of `KV_REST_API_URL`/`KV_REST_API_TOKEN`)
    automatisch in je environment; beide namen worden ondersteund.
-4. Deploy. Host-URL: `https://<jouw-app>.vercel.app/host`.
+4. Zet een **`HOST_PASSWORD`** environment variable (aangeraden voor een
+   publieke deploy). Alleen wie dit wachtwoord kent kan op `/host` een game
+   aanmaken. De variabele staat alleen server-side, dus hij belandt nooit in de
+   browser. Laat hem leeg/weg om iedereen games te laten starten (handig lokaal).
+5. Deploy. Host-URL: `https://<jouw-app>.vercel.app/host`.
 
 > Het hostscherm onthoudt de hostKey in localStorage én in de URL
 > (`/host/<pin>?key=…`), dus je kunt het beamerscherm openen op een andere

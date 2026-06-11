@@ -112,6 +112,12 @@ export function buildRaceCars(players: PlayerData[], seed: number): RaceCar[] {
   return players.map((p) => {
     const rng = rngFor("car", seed, p.id);
     const skill = skillOf(p);
+    const roundNums = Object.keys(p.rounds)
+      .map(Number)
+      .sort((a, b) => a - b);
+    const lastVerdict = roundNums.length
+      ? p.rounds[roundNums[roundNums.length - 1]].verdict
+      : "none";
     const speed =
       RACE_SPEED_MIN +
       skill * (RACE_SPEED_MAX - RACE_SPEED_MIN) +
@@ -129,6 +135,7 @@ export function buildRaceCars(players: PlayerData[], seed: number): RaceCar[] {
       name: p.name,
       color: p.color,
       skill,
+      lastVerdict,
       speed,
       spins,
       finishTime,

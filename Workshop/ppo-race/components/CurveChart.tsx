@@ -19,16 +19,28 @@ export interface CurveSeries {
  * SVG learning-curve chart with a fixed x-domain over all rounds, so curves
  * visibly grow to the right as the game progresses.
  */
+/** Indices where the curve drops sharply into low return, i.e. a collapse. */
+function collapseIdxs(curve: number[]): number[] {
+  const out: number[] = [];
+  for (let i = 1; i < curve.length; i++) {
+    if (curve[i - 1] - curve[i] > 220 && curve[i] < 250) out.push(i);
+  }
+  return out;
+}
+
 export default function CurveChart({
   series,
   height = 300,
   animate = false,
   highlightRoundBoundaries = true,
+  annotate = false,
 }: {
   series: CurveSeries[];
   height?: number;
   animate?: boolean;
   highlightRoundBoundaries?: boolean;
+  /** shade the "good policy" target band and mark collapse points */
+  annotate?: boolean;
 }) {
   const W = 800;
   const H = height;
@@ -50,6 +62,27 @@ export default function CurveChart({
       role="img"
       aria-label="Learning curves"
     >
+      {/* "good policy" target band */}
+      {annotate && (
+        <g>
+          <rect
+            x={PAD.left}
+            y={y(RETURN_MAX)}
+            width={innerW}
+            height={y(700) - y(RETURN_MAX)}
+            fill="rgba(34,197,94,0.10)"
+          />
+          <text
+            x={PAD.left + 6}
+            y={y(RETURN_MAX) + 14}
+            fontSize={11}
+            fill="rgba(134,239,172,0.9)"
+          >
+            goed beleid
+          </text>
+        </g>
+      )}
+
       {/* grid + axes */}
       {yTicks.map((v) => (
         <g key={v}>
@@ -130,6 +163,22 @@ export default function CurveChart({
           />
         );
       })}
+
+      {/* collapse markers */}
+      {annotate &&
+        series.flatMap((s, idx) =>
+          collapseIdxs(s.curve).map((i) => (
+            <text
+              key={`c${idx}-${i}`}
+              x={x(i)}
+              y={y(s.curve[i]) + 6}
+              fontSize={15}
+              textAnchor="middle"
+            >
+              💥
+            </text>
+          ))
+        )}
     </svg>
   );
 }

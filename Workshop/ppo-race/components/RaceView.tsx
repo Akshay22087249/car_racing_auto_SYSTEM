@@ -3,7 +3,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { RACE_LAPS } from "@/lib/constants";
 import { buildTrack, carAt, pointAt } from "@/lib/race";
-import type { RaceCar } from "@/lib/types";
+import type { RaceCar, Verdict } from "@/lib/types";
+
+/** Why a car spins, tied back to how its agent was tuned (E3). */
+function spinReason(v: Verdict): string {
+  switch (v) {
+    case "collapsed":
+      return "beleid ingestort, clip/lr te groot";
+    case "unstable":
+      return "grillig getuned, grip kwijt";
+    case "slow":
+      return "traag beleid, weinig controle";
+    default:
+      return "kleine misser";
+  }
+}
 
 interface Standing {
   car: RaceCar;
@@ -15,7 +29,7 @@ interface Standing {
 
 /**
  * Replays the deterministic race that the server already scored: same seed,
- * same spin events, same finish times — only the rendering happens here.
+ * same spin events, same finish times, only the rendering happens here.
  */
 export default function RaceView({
   cars,
@@ -33,7 +47,11 @@ export default function RaceView({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [standings, setStandings] = useState<Standing[]>([]);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
+  const idRef = useRef(0);
   const doneRef = useRef(false);
+  const spinRef = useRef<Record<string, boolean>>({});
+  const finRef = useRef<Record<string, boolean>>({});
   // keep the callback in a ref so re-renders don't restart the animation loop
   const onAllFinishedRef = useRef(onAllFinished);
   useEffect(() => {
@@ -186,6 +204,34 @@ export default function RaceView({
           )
           .map((row, i) => ({ ...row, position: i + 1 }));
         setStandings(rows);
+
+        // commentary: detect new spins / finishes since the last tick
+        const events: string[] = [];
+        cars.forEach((car) => {
+          const st = carAt(car, totalDist, Math.max(t, 0));
+          if (st.spinning && !spinRef.current[car.id]) {
+            spinRef.current[car.id] = true;
+            events.push(`💥 ${car.name} tolt: ${spinReason(car.lastVerdict)}`);
+          } else if (!st.spinning && spinRef.current[car.id]) {
+            spinRef.current[car.id] = false;
+          }
+          if (st.finished && !finRef.current[car.id]) {
+            finRef.current[car.id] = true;
+            events.push(`🏁 ${car.name} over de finish!`);
+          }
+        });
+        if (events.length) {
+          const items = events.map((text) => ({ id: idRef.current++, text }));
+          setToasts((cur) => [...items, ...cur].slice(0, 4));
+          // pop-ups are transient: drop each after a few seconds
+          items.forEach((it) =>
+            setTimeout(
+              () => setToasts((cur) => cur.filter((x) => x.id !== it.id)),
+              4500
+            )
+          );
+        }
+
         if (t > maxFinish + 1.5 && !doneRef.current) {
           doneRef.current = true;
           onAllFinishedRef.current?.();
@@ -211,6 +257,16 @@ export default function RaceView({
             </span>
           </div>
         )}
+        <div className="pointer-events-none absolute inset-x-0 top-3 flex flex-col items-center gap-2 px-4">
+          {toasts.map((t) => (
+            <div
+              key={t.id}
+              className="race-toast max-w-[90%] rounded-full border border-white/15 bg-slate-900/85 px-4 py-2 text-center text-base font-semibold text-white shadow-xl backdrop-blur-sm"
+            >
+              {t.text}
+            </div>
+          ))}
+        </div>
       </div>
       <ol className="w-72 shrink-0 space-y-1.5 max-h-[70vh] overflow-y-auto pr-1">
         {standings.map((row) => (

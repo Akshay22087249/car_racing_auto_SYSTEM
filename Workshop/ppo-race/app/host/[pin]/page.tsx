@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Countdown from "@/components/Countdown";
 import CurveChart from "@/components/CurveChart";
 import RaceView from "@/components/RaceView";
+import { CLIP_OPTIONS, LR_OPTIONS, lrLabel, roundEnv } from "@/lib/constants";
+import { PPO_FACTS, RECAP_POINTS, RECAP_SOURCE } from "@/lib/education";
 import { VERDICT_LABELS } from "@/lib/sim";
 import { useGame, postJson } from "@/lib/useGame";
-import type { StateResponse } from "@/lib/types";
+import type { ChoiceDist, StateResponse } from "@/lib/types";
 
 export default function HostScreen() {
   const { pin } = useParams<{ pin: string }>();
@@ -16,6 +18,8 @@ export default function HostScreen() {
   const [keyMissing, setKeyMissing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [raceDone, setRaceDone] = useState(false);
+  const songRef = useRef<HTMLAudioElement>(null);
+  const fadeRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     // ?key=… makes the host screen portable (e.g. open it on the beamer pc)
@@ -37,6 +41,53 @@ export default function HostScreen() {
     await postJson(`/api/game/${pin}/host`, { hostKey, action });
     setBusy(false);
   };
+
+  // start the race anthem on the host's click; a user gesture lets it autoplay
+  const startRace = async () => {
+    const a = songRef.current;
+    if (a) {
+      a.currentTime = 0;
+      a.volume = 0;
+      a.play().catch(() => {});
+      // fade the volume in over the 3s race countdown
+      const FADE_MS = 3000;
+      const TARGET_VOL = 0.7;
+      const start = Date.now();
+      if (fadeRef.current) clearInterval(fadeRef.current);
+      fadeRef.current = setInterval(() => {
+        const p = Math.min((Date.now() - start) / FADE_MS, 1);
+        a.volume = TARGET_VOL * p;
+        if (p >= 1 && fadeRef.current) {
+          clearInterval(fadeRef.current);
+          fadeRef.current = null;
+        }
+      }, 50);
+    }
+    await act("startRace");
+  };
+
+  // stop the anthem (and any running fade) as soon as we leave the race
+  useEffect(() => {
+    if (state?.phase !== "race") {
+      if (fadeRef.current) {
+        clearInterval(fadeRef.current);
+        fadeRef.current = null;
+      }
+      const a = songRef.current;
+      if (a && !a.paused) {
+        a.pause();
+        a.currentTime = 0;
+      }
+    }
+  }, [state?.phase]);
+
+  // clear any running fade on unmount
+  useEffect(
+    () => () => {
+      if (fadeRef.current) clearInterval(fadeRef.current);
+    },
+    []
+  );
 
   const memoryWarning =
     state?.storage === "memory" &&
@@ -70,10 +121,11 @@ export default function HostScreen() {
 
   return (
     <main className="flex flex-1 flex-col p-8 lg:p-12 gap-8">
+      <audio ref={songRef} src="/race-song.mp3" preload="auto" />
       {memoryWarning && (
         <div className="rounded-xl bg-red-900/60 border border-red-500 px-4 py-2 text-sm">
-          ⚠️ Geen Redis gekoppeld (UPSTASH_REDIS_REST_URL/TOKEN ontbreekt) — op
-          Vercel gaat de gamestate zo verloren tussen requests. Zie de README.
+          ⚠️ Geen Redis gekoppeld (UPSTASH_REDIS_REST_URL/TOKEN ontbreekt). Op
+          Vercel raakt de gamestate zo tussen requests kwijt. Zie de README.
         </div>
       )}
       {state.phase === "lobby" && (
@@ -83,7 +135,7 @@ export default function HostScreen() {
         <Round state={state} offsetRef={offsetRef} busy={busy} onEnd={() => act("endRound")} />
       )}
       {state.phase === "results" && (
-        <Results state={state} busy={busy} onNext={() => act("startRound")} onRace={() => act("startRace")} />
+        <Results state={state} busy={busy} onNext={() => act("startRound")} onRace={startRace} />
       )}
       {state.phase === "race" && state.race && (
         <section className="flex flex-1 flex-col gap-6">
@@ -210,25 +262,35 @@ function Round({
   busy: boolean;
   onEnd: () => void;
 }) {
+  const env = roundEnv(state.round);
   return (
-    <section className="flex flex-1 flex-col items-center justify-center gap-10 text-center">
-      <h1 className="text-4xl font-black">
-        Ronde {state.round}/{state.totalRounds} — kies je{" "}
-        <span className="text-amber-400">clip ε</span> op je telefoon
-      </h1>
-      <p className="text-2xl text-slate-300 max-w-3xl">
-        Hoe groot mogen de policy-updates van je PPO-agent zijn? Te groot =
-        instortingsgevaar 💥 · te klein = bijna geen vooruitgang 🐌
-      </p>
+    <section className="flex flex-1 flex-col items-center gap-6 text-center">
+      <div className="space-y-1">
+        <h1 className="text-4xl font-black">
+          Ronde {state.round}/{state.totalRounds}:{" "}
+          <span className="text-amber-400">{env.theme}</span>
+        </h1>
+        <p className="text-xl text-slate-300 max-w-3xl">
+          Stem je PPO-agent af op je telefoon. Te groot = instortingsgevaar 💥 ·
+          te klein = bijna geen vooruitgang 🐌
+          {env.showLr ? " · nu ook de learning rate!" : ""}
+        </p>
+      </div>
       <Countdown
         endsAt={state.roundEndsAt}
         offsetRef={offsetRef}
-        className="text-9xl font-black"
+        className="text-8xl font-black"
       />
-      <p className="text-3xl font-bold text-slate-200 tabular-nums">
+      <p className="text-2xl font-bold text-slate-200 tabular-nums">
         {state.answeredCount}/{state.playerCount} hebben getraind
       </p>
       <PlayerChips state={state} showAnswered={true} />
+
+      <div className="grid w-full max-w-5xl gap-6 lg:grid-cols-2">
+        <ChoiceHistogram dist={state.choiceDist} showLr={env.showLr} />
+        <RotatingFact />
+      </div>
+
       <button
         onClick={onEnd}
         disabled={busy}
@@ -237,6 +299,97 @@ function Round({
         Ronde afsluiten
       </button>
     </section>
+  );
+}
+
+function ChoiceHistogram({
+  dist,
+  showLr,
+}: {
+  dist?: ChoiceDist;
+  showLr: boolean;
+}) {
+  const clipCounts = CLIP_OPTIONS.map((c) => dist?.clip?.[String(c)] ?? 0);
+  const lrCounts = LR_OPTIONS.map((l) => dist?.lr?.[String(l)] ?? 0);
+  const maxClip = Math.max(1, ...clipCounts);
+  const maxLr = Math.max(1, ...lrCounts);
+  return (
+    <div className="rounded-2xl bg-slate-800/60 p-4 text-left">
+      <p className="mb-3 text-sm font-bold text-slate-300">Wat kiest de klas?</p>
+      <Bars
+        title="clip ε"
+        labels={CLIP_OPTIONS.map(String)}
+        counts={clipCounts}
+        max={maxClip}
+      />
+      {showLr && (
+        <div className="mt-4">
+          <Bars
+            title="learning rate"
+            labels={LR_OPTIONS.map(lrLabel)}
+            counts={lrCounts}
+            max={maxLr}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Bars({
+  title,
+  labels,
+  counts,
+  max,
+}: {
+  title: string;
+  labels: string[];
+  counts: number[];
+  max: number;
+}) {
+  return (
+    <div>
+      <p className="mb-1 text-xs uppercase tracking-wide text-slate-500">
+        {title}
+      </p>
+      <div className="space-y-1">
+        {labels.map((lab, i) => (
+          <div key={lab} className="flex items-center gap-2">
+            <span className="w-12 shrink-0 text-right text-xs tabular-nums text-slate-400">
+              {lab}
+            </span>
+            <div className="h-4 flex-1 rounded bg-slate-700/40">
+              <div
+                className="h-4 rounded bg-amber-400 transition-all"
+                style={{ width: `${(counts[i] / max) * 100}%` }}
+              />
+            </div>
+            <span className="w-6 text-xs tabular-nums text-slate-400">
+              {counts[i] || ""}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RotatingFact() {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const id = setInterval(
+      () => setI((n) => (n + 1) % PPO_FACTS.length),
+      7000
+    );
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div className="flex items-center rounded-2xl border border-indigo-500/40 bg-indigo-950/70 p-5 text-left">
+      <p className="text-lg leading-relaxed text-indigo-100">
+        <span className="mr-2">💡</span>
+        {PPO_FACTS[i]}
+      </p>
+    </div>
   );
 }
 
@@ -261,7 +414,7 @@ function Results({
     <section className="flex flex-1 flex-col gap-6">
       <header className="flex items-center justify-between gap-4">
         <h1 className="text-4xl font-black">
-          Learning curves — na ronde {state.round}/{state.totalRounds}
+          Learning curves na ronde {state.round}/{state.totalRounds}
         </h1>
         <button
           onClick={lastRound ? onRace : onNext}
@@ -276,6 +429,7 @@ function Results({
           <CurveChart
             series={curves.map((c) => ({ curve: c.curve, color: c.color }))}
             height={420}
+            annotate
           />
         </div>
         <div className="flex flex-col gap-3 min-h-0">
@@ -292,7 +446,11 @@ function Results({
                 />
                 <span className="truncate font-medium">{c.name}</span>
                 <span className="ml-1 text-xs text-slate-400">
-                  {c.clip !== null ? `ε=${c.clip}` : "—"} · {VERDICT_LABELS[c.verdict]}
+                  {c.clip !== null ? `ε=${c.clip}` : "geen"}
+                  {c.lr !== null && roundEnv(state.round).showLr
+                    ? ` · lr ${lrLabel(c.lr)}`
+                    : ""}{" "}
+                  · {VERDICT_LABELS[c.verdict]}
                 </span>
                 <span className="ml-auto font-bold tabular-nums text-amber-300">
                   +{c.points}
@@ -303,12 +461,14 @@ function Results({
           <div className="rounded-xl bg-indigo-950/70 border border-indigo-500/40 p-4 text-sm leading-relaxed text-indigo-100">
             <p className="font-bold mb-1">📚 Wat zie je?</p>
             <p>
-              <b>Vlak</b> = clip ε te klein: piepkleine updates, de agent leert
-              traag. <b>Grillig of ingestort</b> = clip ε te groot: enorme
-              policy-updates vernietigen geleerd gedrag. De <b>sweet spot</b>{" "}
-              (rond ε ≈ 0.1–0.3) geeft een stabiel stijgende curve.
+              Een <b>vlakke</b> curve betekent te kleine updates: clip ε of
+              learning rate te laag, dus de agent leert nauwelijks bij. Een{" "}
+              <b>grillige of ingestorte</b> curve betekent te grote updates: clip
+              ε of learning rate te hoog, waardoor geleerd gedrag sneuvelt. De{" "}
+              <b>sweet spot</b> (clip ε rond 0.1 tot 0.3) geeft een stabiel
+              stijgende curve.
               {!lastRound &&
-                " Stel bij in de volgende ronde — je traint verder vanaf waar je nu bent!"}
+                " Stel bij in de volgende ronde, je traint verder vanaf waar je nu bent."}
             </p>
           </div>
         </div>
@@ -318,48 +478,90 @@ function Results({
 }
 
 function Podium({ state }: { state: StateResponse }) {
+  const [showRecap, setShowRecap] = useState(false);
   const top3 = state.players.slice(0, 3);
   const medals = ["🥇", "🥈", "🥉"];
   const heights = ["h-44", "h-32", "h-24"];
   const order = [1, 0, 2]; // silver, gold, bronze layout
   return (
-    <section className="flex flex-1 flex-col items-center gap-10">
-      <h1 className="text-5xl font-black mt-4">🏆 Eindstand</h1>
-      <div className="flex items-end gap-6">
-        {order.map((idx) =>
-          top3[idx] ? (
-            <div key={top3[idx].id} className="flex flex-col items-center gap-3">
-              <span className="text-6xl">{medals[idx]}</span>
-              <span className="text-2xl font-bold">{top3[idx].name}</span>
-              <span className="text-xl text-amber-300 font-bold tabular-nums">
-                {top3[idx].score} punten
-              </span>
-              <div
-                className={`w-40 ${heights[idx]} rounded-t-xl`}
-                style={{ background: top3[idx].color }}
-              />
-            </div>
-          ) : null
-        )}
+    <section className="flex flex-1 flex-col items-center gap-8">
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-4">
+        <h1 className="text-5xl font-black">
+          {showRecap ? "📚 Wat hebben we geleerd?" : "🏆 Eindstand"}
+        </h1>
+        <button
+          onClick={() => setShowRecap((v) => !v)}
+          className="rounded-xl bg-indigo-500 px-5 py-2.5 text-lg font-bold hover:bg-indigo-400"
+        >
+          {showRecap ? "← Naar de eindstand" : "📚 Wat hebben we geleerd?"}
+        </button>
       </div>
-      <ol className="w-full max-w-2xl space-y-1.5">
-        {state.players.map((p, i) => (
-          <li
-            key={p.id}
-            className="flex items-center gap-3 rounded-lg bg-slate-800/80 px-4 py-2"
-          >
-            <span className="w-8 font-bold text-slate-400 tabular-nums">{i + 1}.</span>
-            <span
-              className="inline-block h-3 w-3 rounded-full shrink-0"
-              style={{ background: p.color }}
-            />
-            <span className="font-medium">{p.name}</span>
-            <span className="ml-auto font-bold tabular-nums text-amber-300">
-              {p.score}
-            </span>
-          </li>
-        ))}
-      </ol>
+
+      {showRecap ? (
+        <Recap />
+      ) : (
+        <>
+          <div className="flex items-end gap-6">
+            {order.map((idx) =>
+              top3[idx] ? (
+                <div
+                  key={top3[idx].id}
+                  className="flex flex-col items-center gap-3"
+                >
+                  <span className="text-6xl">{medals[idx]}</span>
+                  <span className="text-2xl font-bold">{top3[idx].name}</span>
+                  <span className="text-xl text-amber-300 font-bold tabular-nums">
+                    {top3[idx].score} punten
+                  </span>
+                  <div
+                    className={`w-40 ${heights[idx]} rounded-t-xl`}
+                    style={{ background: top3[idx].color }}
+                  />
+                </div>
+              ) : null
+            )}
+          </div>
+          <ol className="w-full max-w-2xl space-y-1.5">
+            {state.players.map((p, i) => (
+              <li
+                key={p.id}
+                className="flex items-center gap-3 rounded-lg bg-slate-800/80 px-4 py-2"
+              >
+                <span className="w-8 font-bold text-slate-400 tabular-nums">
+                  {i + 1}.
+                </span>
+                <span
+                  className="inline-block h-3 w-3 rounded-full shrink-0"
+                  style={{ background: p.color }}
+                />
+                <span className="font-medium">{p.name}</span>
+                <span className="ml-auto font-bold tabular-nums text-amber-300">
+                  {p.score}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
     </section>
+  );
+}
+
+function Recap() {
+  return (
+    <div className="w-full max-w-4xl space-y-4">
+      <div className="grid gap-4 md:grid-cols-2">
+        {RECAP_POINTS.map((pt) => (
+          <div
+            key={pt.title}
+            className="rounded-2xl border border-indigo-500/40 bg-indigo-950/60 p-5 text-left"
+          >
+            <p className="mb-1 text-xl font-bold text-amber-300">{pt.title}</p>
+            <p className="leading-relaxed text-indigo-100">{pt.body}</p>
+          </div>
+        ))}
+      </div>
+      <p className="text-center text-sm text-slate-500">{RECAP_SOURCE}</p>
+    </div>
   );
 }

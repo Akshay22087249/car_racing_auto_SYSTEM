@@ -36,7 +36,7 @@ export default function JoinPage() {
         🏎️ PPO <span className="text-amber-400">Race</span>
       </h1>
       <p className="text-slate-300 max-w-sm">
-        Tune je PPO-agent, ronde voor ronde — en race daarna tegen de rest!
+        Tune je PPO-agent, ronde voor ronde, en race daarna tegen de rest!
       </p>
       <form onSubmit={join} className="flex w-full max-w-xs flex-col gap-4">
         <input
