@@ -1,0 +1,12 @@
+# Multi-agent RL stack for Warlords (Python 3.11). The Atari backend
+# (multi-agent-ale-py) is compiled from source, so CMake must be installed.
+gymnasium==0.28.1
+pettingzoo[atari]==1.24.3
+supersuit==3.9.0
+stable-baselines3==2.3.2
+AutoROM[accept-rom-license]==0.6.1
+torch
+numpy
+matplotlib
+imageio
+imageio-ffmpeg

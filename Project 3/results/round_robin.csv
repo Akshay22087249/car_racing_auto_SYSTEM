@@ -1,0 +1,6 @@
+agent,win_rate,wins,plays,mean_survival
+rule,0.25,4,16,19198
+random,0.125,2,16,14935
+a2c_solo,0.062,1,16,24822
+dqn_solo,0.062,1,16,16424
+ppo_solo,0.0,0,16,23766

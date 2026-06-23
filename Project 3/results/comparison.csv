@@ -1,0 +1,6 @@
+agent,vs_random_winrate,vs_random_survival,vs_rule_winrate,vs_rule_survival
+random,0.125,4862,0.25,4564
+rule,0.25,4703,0.25,5801
+a2c_solo,0.125,4910,0.0,3992
+dqn_solo,0.125,5424,0.0,7016
+ppo_solo,0.062,9019,0.0,9751
