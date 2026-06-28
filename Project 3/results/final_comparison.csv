@@ -1,0 +1,5 @@
+agent,win_rate,loss_rate,timeout_rate,mean_survival,games
+random,0.25,0.75,0.0,5018,160
+rule_agent,0.281,0.719,0.0,5712,160
+ppo_agent,0.062,0.55,0.388,42534,160
+tuned_agent,0.319,0.681,0.0,5724,160
